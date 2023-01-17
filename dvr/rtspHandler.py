@@ -1,59 +1,48 @@
 import cv2
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QPixmap, QImage
 from loguru import logger
-import os 
+from PyQt5.QtGui import QPixmap, QImage
 
-class CaptureIpCameraFramesWorker(QThread):
-    # Signal emitted when a new image or a new frame is ready.
-    # ImageUpdated = pyqtSignal(QImage)
+from threading import Thread
 
-    def __init__(self, url, the_disp) -> None:
-        super(CaptureIpCameraFramesWorker, self).__init__()
-        # Declare and initialize instance variables.
+class CaptureIpCameraFramesWorker:
+    def __init__(self, url, the_disp):
         self.url = url
-        self.__thread_active = True
+        self.active = False
         self.fps = 0
-        self.__thread_pause = False
         self.disp = the_disp
+        self.thread = None
 
-    def run(self) -> None:
-        # Capture video from a network stream.
+    def start(self):
+        self.active = True
+        self.thread = Thread(target=self.run)
+        self.thread.start()
+
+    def stop(self):
+        self.active = False
+        if self.thread is not None:
+            self.thread.join()
+
+    def isRunning(self):
+        return self.active
+
+    def run(self):
         cap = cv2.VideoCapture(self.url)
-        # Get default video FPS.
         self.fps = cap.get(cv2.CAP_PROP_FPS)
-        # print(self.fps)
-        # If video capturing has been initialized already.q
         if not cap.isOpened():
             logger.error(f"Opening {self.url} is failed!")
-            # When everything done, release the video capture object.
+            self.active = False
             cap.release()
-            # Tells the thread's event loop to exit with return code 0 (success).
-            self.quit()
             return
         logger.trace(f"Opening {self.url} is successful!")
-        # While the thread is active.
-        while self.__thread_active:
-            if self.__thread_pause:
-                continue
-            # Grabs, decodes and returns the next video frame.
+        while self.active:
             ret, frame = cap.read()
-            # If frame is read correctly.
             if not ret:
                 break
-            # cv2.imshow(self.url, frame)
-            # cv2.waitKey(1)
             cv_rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             cv_rgb_image = self.prepare_disp_img(cv_rgb_image, self.disp.width(), self.disp.height())
             qt_rgb_image_scaled = self.convert_nparray_to_QImage(cv_rgb_image)
-            # Emit this signal to notify that a new image or frame is available.
             self.disp.setPixmap(QPixmap.fromImage(qt_rgb_image_scaled))
-            # self.ImageUpdated.emit(qt_rgb_image_scaled)
-            # logger.trace(f'{self.url} says hi!')
-        # When everything done, release the video capture object.
         cap.release()
-        # Tells the thread's event loop to exit with return code 0 (success).
-        self.quit()
 
     def prepare_disp_img(self, img, w, h):
         disp = img.copy()
@@ -68,19 +57,13 @@ class CaptureIpCameraFramesWorker(QThread):
         qimg = QImage(disp.data, w, h, (3 * w), QImage.Format_RGB888) 
         return qimg
 
-    def stop(self) -> None:
-        self.__thread_active = False
-
-    def pause(self) -> None:
-        self.__thread_pause = True
-
-    def unpause(self) -> None:
-        self.__thread_pause = False
 
 if __name__ == "__main__":
-    RTSP_URL = 'rtsp://admin:YSBCAW@192.168.100.2:554/Streaming/Channels/101'
+    RTSP_URL1 = 'rtsp://admin:YSBCAW@192.168.100.2:554/H.264'
+    RTSP_URL2 = "rtsp://admin:YICSVF@192.168.100.3:554/H.264"
+    RTSP_URL3 = "rtsp://admin:PEJEEL@192.168.100.4:554/H.264"
 
-    cap = cv2.VideoCapture(RTSP_URL)#, cv2.CAP_FFMPEG)
+    cap = cv2.VideoCapture(RTSP_URL3)#, cv2.CAP_FFMPEG)
 
     if not cap.isOpened():
         print('Cannot open RTSP stream')
