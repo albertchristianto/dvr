@@ -1,11 +1,13 @@
-from PyQt5.QtWidgets import QMainWindow, QSizePolicy, QApplication
+from PyQt5.QtWidgets import QMainWindow, QSizePolicy
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import QTimer
 from loguru import logger
-import numpy as np
 import json
 
 from .template import Ui_MainWindow
 from ..rtspHandler import CaptureIpCameraFramesWorker
+
+SHOW_WATCH_TRACE_N = 100000000
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self) -> None:
@@ -39,26 +41,43 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.watchQThread)
         self.timer.start(1000)
+        self.watch_trace = 0
+
+    def ShowCamera1(self, frame: QImage) -> None:
+        self.Ch1.setPixmap(QPixmap.fromImage(frame))
+
+    def ShowCamera2(self, frame: QImage) -> None:
+        self.Ch2.setPixmap(QPixmap.fromImage(frame))
+
+    def ShowCamera3(self, frame: QImage) -> None:
+        self.Ch3.setPixmap(QPixmap.fromImage(frame))
+
+    def ShowCamera4(self, frame: QImage) -> None:
+        self.Ch4.setPixmap(QPixmap.fromImage(frame))
 
     def startQThread(self):
         if self.SystemParam['Ch1'][0] != "":
             # logger.trace(f"Opening {self.SystemParam['Ch1'][0]}")
             self.CaptureIpCameraFramesWorker_1 = CaptureIpCameraFramesWorker(self.SystemParam['Ch1'][0], self.Ch1)
+            self.CaptureIpCameraFramesWorker_1.ImageUpdated.connect(self.ShowCamera1)
             logger.trace("Starting Channel 1 thread!")
             self.CaptureIpCameraFramesWorker_1.start()
         if self.SystemParam['Ch2'][0] != "":
             # logger.trace(f"Opening {self.SystemParam['Ch2'][0]}")
             self.CaptureIpCameraFramesWorker_2 = CaptureIpCameraFramesWorker(self.SystemParam['Ch2'][0], self.Ch2)
+            self.CaptureIpCameraFramesWorker_2.ImageUpdated.connect(self.ShowCamera2)
             logger.trace("Starting Channel 2 thread!")
             self.CaptureIpCameraFramesWorker_2.start()
         if self.SystemParam['Ch3'][0] != "":
             # logger.trace(f"Opening {self.SystemParam['Ch3'][0]}")
             self.CaptureIpCameraFramesWorker_3 = CaptureIpCameraFramesWorker(self.SystemParam['Ch3'][0], self.Ch3)
+            self.CaptureIpCameraFramesWorker_3.ImageUpdated.connect(self.ShowCamera3)
             logger.trace("Starting Channel 3 thread!")
             self.CaptureIpCameraFramesWorker_3.start()
         if self.SystemParam['Ch4'][0] != "":
             # logger.trace(f"Opening {self.SystemParam['Ch4'][0]}")
             self.CaptureIpCameraFramesWorker_4 = CaptureIpCameraFramesWorker(self.SystemParam['Ch4'][0], self.Ch4)
+            self.CaptureIpCameraFramesWorker_4.ImageUpdated.connect(self.ShowCamera4)
             logger.trace("Starting Channel 4 thread!")
             self.CaptureIpCameraFramesWorker_4.start()
 
@@ -75,10 +94,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.CaptureIpCameraFramesWorker_4 is not None and not self.CaptureIpCameraFramesWorker_4.isRunning():
             logger.trace("Re-Starting Channel 4 thread!")
             self.CaptureIpCameraFramesWorker_4.start()
-        # QApplication.processEvents()
+        # if self.watch_trace % SHOW_WATCH_TRACE_N == 0:
+        #     logger.trace(f'watcher thread!')
 
-    def closeEvent(self):
-        print("User has clicked the red x on the main window")
+    def closeEvent(self, ev):
         if self.CaptureIpCameraFramesWorker_1 is not None:
             self.CaptureIpCameraFramesWorker_1.stop()
         if self.CaptureIpCameraFramesWorker_2 is not None:
@@ -88,6 +107,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.CaptureIpCameraFramesWorker_4 is not None:
             self.CaptureIpCameraFramesWorker_4.stop()
         logger.trace("Quit!")
+        ev.accept()
 
     def __SetupUI(self) -> None:
         self.CentralWidget.setLayout(self.MainLayout)
